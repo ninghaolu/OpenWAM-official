@@ -12,7 +12,7 @@ reader can import it without triggering heavy module side-effects or import cycl
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from PIL import Image
 
@@ -54,8 +54,18 @@ def _warn_seek_fallback(video_path: str, min_idx: int, max_idx: int, reason: str
         )
 
 
-def decode_video_frames(video_path: str, frame_indices: List[int], height: int, width: int) -> List[Image.Image]:
+def decode_video_frames(
+    video_path: str,
+    frame_indices: List[int],
+    height: int,
+    width: int,
+    crop_box: Optional[Tuple[int, int, int, int]] = None,
+) -> List[Image.Image]:
     """Decode requested frames via PyAV with seek-to-keyframe optimization.
+
+    ``crop_box`` (PIL ``(left, upper, right, lower)``, right/lower exclusive)
+    is applied to each decoded frame before the resize; ``None`` keeps the
+    full frame.
 
     Repacked file-NNN.mp4 can hold many episodes, so decoding sequentially from
     frame zero can dominate worker time. Seek to the keyframe immediately
@@ -136,6 +146,8 @@ def decode_video_frames(video_path: str, frame_indices: List[int], height: int, 
     missing = set(frame_indices) - idx_map.keys()
     if missing:
         raise RuntimeError(f"missing frames {missing} in {video_path}")
+    if crop_box is not None:
+        return [idx_map[i].crop(crop_box).resize((width, height), Image.LANCZOS) for i in frame_indices]
     return [idx_map[i].resize((width, height), Image.LANCZOS) for i in frame_indices]
 
 

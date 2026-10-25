@@ -796,6 +796,10 @@ class LeRobotV3Reader(BaseDataset):
     def _post_init(self, info: dict) -> None:
         """Optional one-time per-dataset setup (e.g. Fractal quat sanity check)."""
 
+    def _camera_crop_box(self, camera: str, row) -> Optional[Tuple[int, int, int, int]]:
+        """Per-episode PIL crop box applied to ``camera`` frames before resize, or None (full frame)."""
+        return None
+
     @classmethod
     def _multibucket_wrapper(cls):
         """Root-mode aggregate wrapper class, or None when only single-bucket is supported."""
@@ -1099,7 +1103,7 @@ class LeRobotV3Reader(BaseDataset):
             v_base = int(self._ep_video_frame_offsets[camera][ep_local]) + offset
             frame_indices = (real_local_indices + v_base).tolist()
             h, w = (_HEAD_SLOT_H, _HEAD_SLOT_W) if self._multiview else (self._height, self._width)
-            return _decode_video_frames(str(path), frame_indices, h, w)
+            return _decode_video_frames(str(path), frame_indices, h, w, self._camera_crop_box(camera, row))
 
         # wrist: tolerated decode — path/offset computation lives INSIDE the try so a
         # corrupt chunk/file index or offset lookup degrades to a black slot rather
@@ -1110,7 +1114,9 @@ class LeRobotV3Reader(BaseDataset):
             )
             v_base = int(self._ep_video_frame_offsets[camera][ep_local]) + offset
             frame_indices = (real_local_indices + v_base).tolist()
-            return _decode_video_frames(str(path), frame_indices, _WRIST_SLOT_H, _WRIST_SLOT_W)
+            return _decode_video_frames(
+                str(path), frame_indices, _WRIST_SLOT_H, _WRIST_SLOT_W, self._camera_crop_box(camera, row)
+            )
         except self.WRIST_DECODE_TOLERATED as e:
             self._wrist_fail_count += 1
             if self._wrist_fail_count == 1 or self._wrist_fail_count % self._fail_log_every == 0:

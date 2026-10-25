@@ -1,0 +1,47 @@
+type: abc
+
+# ABC-130k (YAM bimanual) LeRobot v3 export:
+#   <dataset_dir>/{meta,data,videos}  — 30 Hz, 14-D joint action/state, 224x224 AV1 video.
+dataset_dir: /projects/work/yang-lab/projects/pretrain_world_model/abc_130k_v3_train
+
+# ── Action space ─────────────────────────────────────────────────────────────
+# Joints are mapped to EEF20 by YAM forward kinematics (per-arm base frame,
+# tool point = tcp_site + 0.1347 m along site z), normalized, then scattered
+# into the shared 80-D layout: left [xyz3, rot6d6, grip1] -> 0:10; right -> 34:44.
+action_mode: eef
+fk_mjcf_path: /projects/work/yang-lab/projects/pretrain_world_model/ABC-130k/assets/yam_mujoco/put_bottle.xml
+unify_action: true
+unify_action_map: ["0-9", "34-43"]
+unify_state_map: null  # null = state reuses unify_action_map
+
+# ── Frame sampling ───────────────────────────────────────────────────────────
+# α contract: 33 frames -> 32-step action chunk (1.07 s at 30 Hz); video every 4th frame.
+num_frames: 33
+video_stride: 4
+window_stride: 1
+split: train
+
+# ── Rendering (3-slot L-shape canvas) ────────────────────────────────────────
+# [head, left wrist, right wrist]; at 384x320 the head tile is 256Hx320W and
+# each wrist tile is 128Hx160W. Sources are 224x224 letterboxed squares; the
+# per-episode layout table crops the black bars before resizing (null = keep bars).
+# Build: python -m openwam.dataloader.utils.abc_letterbox
+height: 384
+width: 320
+multiview: true
+camera_layout: [observation.images.top, observation.images.left_wrist, observation.images.right_wrist]
+letterbox_layouts_path: /projects/work/yang-lab/projects/policy-finetuning/norm_stats_abc/openwam/abc_letterbox_layouts_train.npy
+
+# ── Normalization ────────────────────────────────────────────────────────────
+# EEF20 stats (eef / eef_state blocks); build with
+#   python -m openwam.dataloader.utils.stats_computation.abc_stats_computation
+normalize_mode: min-max
+normalization_stats_path: /projects/work/yang-lab/projects/policy-finetuning/norm_stats_abc/openwam/abc_eef20_normalization_stats.npy
+
+# ── Video augmentation ───────────────────────────────────────────────────────
+color_jitter:
+  enabled: true
+  brightness: 0.2
+  contrast: 0.2
+  saturation: 0.2
+  hue: 0.0
